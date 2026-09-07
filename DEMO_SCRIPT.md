@@ -1,82 +1,85 @@
 # Demo Video Script (target: under 3 minutes)
 
-This is a shot-by-shot script for recording the required demo video. Follow it in
-order; each shot names exactly what to click and roughly how long to spend on it.
-Record your screen with the app running at `http://127.0.0.1:8000`.
-
-_This script is written from the plan and will be tightened once the real ingestion
-run finishes and the exact relation IDs/pages for each showcase case are known — see
-the placeholders marked `[FILL IN]`._
+Shot-by-shot script, filled in with the exact relations from the real run (see README.md
+"The four required cases" for the full quotes and reasoning — this script only summarises
+what to click and say). Record with the app running at `http://127.0.0.1:8000`, loaded from
+the committed `data/knowledge.db`.
 
 ---
 
-### 0:00 – 0:20 — Upload a PDF (the "accepts new PDFs" requirement)
+### 0:00 – 0:20 — Intro + upload a PDF
 
-1. Open the app. Say (or caption): "This is a Fact Knowledge Layer — upload any PDF,
-   it extracts facts, links them to evidence, and works out which facts agree,
-   disagree, or only look like they disagree."
-2. Drag one of the starter PDFs onto the **Upload** panel (pick a short one, e.g. the
-   Q4 FY24 earnings presentation, so the on-screen wait is short — mention that the
-   full 511-page run across all six documents was done ahead of time and is already
-   loaded).
-3. Point at the stat tiles updating (documents / facts / relations / issues).
+1. Open the app. Say: "This is a Fact Knowledge Layer — upload any PDF, it extracts facts,
+   links them to evidence, and works out which facts agree, disagree, or only look like they
+   disagree. This database already has six real filings processed — 3,198 facts, 2,510
+   relations — but let me show it accepting a new one live."
+2. Drag the Q4 FY24 earnings presentation (or any starter PDF) onto the **Upload** panel.
+   Since it is already ingested (matched by content hash), it will report "already
+   ingested" almost instantly — mention that re-uploading is a no-op, and that a fresh PDF
+   would take a few minutes per hundred pages.
+3. Point at the stat tiles (documents / facts / relations / issues).
 
-### 0:20 – 0:55 — Case 1: a fact corroborated across documents
+### 0:20 – 0:55 — Case 1: corroboration across institutions
 
-1. Click the **Relations** tab, filter to **Corroborates**.
-2. Open the card showing: `[FILL IN: e.g. Delhivery FY24 revenue — ₹8,142 Cr (earnings
-   deck) vs ₹81,415.38 million (annual report)]`.
-3. Point at both quotes side by side, and read the one-line explanation out loud.
-4. Say: "Same fact, different units, different wording, different document — the
-   system normalises both to the same base unit and confirms they match."
+1. **Relations** tab → filter **Corroborates**.
+2. Open the India foreign-exchange-reserves relation: IMF says "$706 billion" (p.12),
+   Economic Survey says "USD 704.9 billion" (p.31), both for September 2024.
+3. Read the explanation aloud: *"...values extremely close (706 vs. 704.9 billion). The
+   small difference is likely due to rounding..."*
+4. Say: "Two different institutions, independently confirming the same figure — the system
+   normalised both to the same unit and period before comparing."
 
-### 0:55 – 1:35 — Case 2: a genuine or likely contradiction
+### 0:55 – 1:35 — Case 2: a genuine contradiction
 
-1. Filter **Relations** to **Contradicts**.
-2. Open: `[FILL IN: e.g. two different institutions stating a different FY25 GDP
-   growth figure for the same period]` — or the director-status case if that turned
-   out to be the cleaner example.
-3. Point at both quotes, the computed relative difference, and the explanation.
-4. Say: "Same period, same entity, no reconciling context found — the system flags
-   this as a real disagreement rather than silently picking one."
+1. Filter to **Contradicts**.
+2. Open the India real-GDP-growth relation: IMF says 6.5% for FY2024/25 (p.10), Economic
+   Survey says 6.4% for FY25 (p.4).
+3. Read the explanation: *"...share the same subject, metric, and scope but provide
+   conflicting numerical values, the difference is genuine..."*
+4. Say: "Same period, same metric, no reconciling context found — flagged as a real
+   disagreement rather than silently averaged or picked."
 
-### 1:35 – 2:15 — Case 3: an apparent contradiction explained by context
+### 1:35 – 2:15 — Case 3: apparent contradictions explained by context
 
-1. Filter **Relations** to **Reconciled by context**.
-2. Open: `[FILL IN: e.g. Delhivery FY24 revenue — ₹74,540.82 million (standalone) vs
-   ₹81,415.38 million (consolidated), same page of the same document]`.
-3. Point at the `axis: scope` tag and read the explanation.
-4. Say: "These look like a contradiction until you notice one is standalone and the
-   other consolidated — the system caught that from the table's own labelling and
-   explains the difference instead of just reporting two different numbers."
+1. Filter to **Reconciled by context**.
+2. Open the **Suvir Suren Sujan** relation (axis: time): active Non-Executive Nominee
+   Director per the 2022 prospectus, resigned per the FY24 annual report.
+3. Read the explanation: *"...his resignation in 2023 ended his active role, aligning with
+   the 2024 document."*
+4. Say: "This is the exact scenario the assignment describes — a director active in one
+   document, resigned in a later one. The system worked out which document was dated later
+   and explained the gap instead of flagging it as a contradiction."
+5. Quickly show the second one too (axis: scope) — Delhivery's FY24 revenue stated as both
+   ₹81,415.38M (consolidated) and ₹74,540.82M (standalone) on the same page: *"...refer to
+   different reporting bases..."*
 
-### 2:15 – 2:45 — Case 4: an extraction/reasoning failure, honestly handled
+### 2:15 – 2:50 — Case 4: an extraction failure, handled honestly
 
-1. Click the **Issues** tab.
-2. Point at the two-column layout issue: show the raw welded text
-   (`"closer to the target, largely due to easing input services exports..."`) either
-   as a logged issue or by briefly showing the PDF page (RBI Annual Report, page with
-   the two-column layout) next to the cleanly-separated result the system now
-   produces after column detection.
-3. Say: "This is a real extraction failure I found early on — two unrelated columns
-   of text getting welded into one nonsense sentence. I fixed it with column
-   detection, but here's a case it still doesn't handle perfectly: `[FILL IN: e.g. a
-   table that legitimately spans both columns]` — and here's what I'd do next."
+1. Say: "Two failures worth showing, both real, both found by running this on the actual
+   PDFs."
+2. First: describe (or show, if you have the RBI PDF page open) the two-column welding bug
+   — read the garbled sentence from README.md's Case 4 section, then say it was fixed with
+   column detection, but a table spanning both columns would still trip it up.
+3. Second: click the **Issues** tab, point at a `quote_not_found` entry — the ESG
+   "reduced ~20%" example is a good one to show. Say: "The model built this number by
+   combining two real figures on the page, but couldn't quote it verbatim, so the system
+   rejected it rather than keep an ungrounded claim. That's the right call for grounding,
+   but it's also a real fact that got lost — a trade-off I'd improve with a 'derived fact'
+   claim type that keeps both source quotes."
 
-### 2:45 – 3:00 — Close
+### 2:50 – 3:00 — Close
 
-1. Quick look at the **Schema** tab: "The metric list isn't hard-coded — it grows as
-   new kinds of facts are found, and this same pipeline runs on any PDF, not just
-   these six."
+1. Quick look at the **Schema** tab: "The metric list isn't hard-coded — it grew to over a
+   thousand entries on its own as this ran across six very different documents."
 2. End.
 
 ---
 
 ## Notes for recording
 
-- Keep each relation card open for 3–5 seconds minimum so a viewer can actually read
-  the quotes — don't rush past them.
-- If OBS/screen recorder adds its own timer, use that to stay under 3:00; trim in
-  editing if you run long rather than talking faster.
-- A voiceover is not required by the brief, but captions or a spoken walkthrough make
-  the four cases much easier to follow than silent clicking.
+- Keep each relation card open for 3–5 seconds minimum so a viewer can actually read the
+  quotes.
+- If short on time, cut the second Case 3 example (3b) rather than rushing case 4 — the
+  brief only requires one example per case.
+- A voiceover is not required by the brief, but reading the explanations aloud (rather than
+  silent clicking) makes the four cases much easier to follow.

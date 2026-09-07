@@ -243,8 +243,43 @@ One page, served by the same server, no build step. Sections:
 | Storage | SQLite, one file |
 | PDF text and layout | PyMuPDF |
 | PDF tables | pdfplumber |
-| Language model | Gemini `gemini-flash-latest` by default, behind an adapter that also speaks OpenAI, Anthropic and Ollama |
+| Language model | Gemini (`gemini-flash-lite-latest`, with automatic fallover across model names on daily-quota exhaustion), behind an adapter that also speaks OpenAI, Anthropic and Ollama |
 | Embeddings | Ollama `nomic-embed-text`, falling back to character n-gram similarity |
 | Tests | pytest, focused on the normalisers and the reconcile rules |
 
 Remaining open items are tracked in `context.md` section 6.
+
+---
+
+## 9. Amendments made while running this against real data
+
+Three things in the pipeline changed shape after being tested against the actual starter
+PDFs, each because a specific, reproducible problem showed up — not as up-front design.
+`context.md` section 4 and the git history have the full story; summarised here:
+
+- **Linking got a filter, not just a grouping.** A single metric recurring across many
+  quarters in one document (e.g. "Adjusted EBITDA" on a trend slide) produced a large group,
+  and naive pairwise comparison inside it mostly produced "these differ because of the
+  quarter" — true, but not an interesting fact relationship, and expensive at scale. `app/
+  linking.py`'s `_is_interesting_pair` now skips a pair when it is same-document,
+  different-period, and otherwise identical in scope — keeping cross-document pairs,
+  same-period pairs, and same-document-different-scope pairs (the standalone/consolidated
+  case) unconditionally.
+- **Reconciliation defaults to no LLM call at all.** The rule engine was always meant to
+  decide the verdict alone; what changed is that the *explanation* also defaults to a fast
+  template built from the same rule trace, with an LLM call reserved for
+  CONTRADICTS/RECONCILED_BY_CONTEXT specifically, and even then only when explicitly
+  requested (`reconcile_pair(..., use_llm=True)`, or via `regenerate_explanation` after the
+  fact). Candidate-pair counts in the hundreds per document made an LLM call on every
+  relation the dominant cost and, once free-tier throttling kicked in, the dominant source
+  of multi-minute stalls in the bulk run.
+- **The metric registry gained two merge guards.** Plain string similarity (and, tested
+  during development, plain embeddings too) scored "Adjusted EBITDA" / "Adjusted EBITDA
+  margin" and "CPI inflation" / "WPI inflation" as closer matches than genuine paraphrases
+  like "Revenue from Operations" / "revenue from services". `app/registry.py` now blocks a
+  merge across a modifier word ("margin", "growth", ...) or a differing all-caps acronym
+  that only one side has, and the alias threshold was lowered afterward now that those two
+  specific failure patterns are guarded separately. `app/reconcile.py` also carries an
+  independent safety net (`_incompatible_units`) so a percentage can never be judged
+  CONTRADICTS/CORROBORATES against a currency amount even if a bad merge still slips
+  through.

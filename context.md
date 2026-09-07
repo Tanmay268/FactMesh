@@ -4,7 +4,10 @@ This file is the running memory of the project. It records what the task is, wha
 I found in the data, what was decided, and what is still open. Read this first if
 you are picking the project up cold.
 
-Status: **PLAN APPROVED — ready to build.**
+Status: **BUILT AND RUN.** Full pipeline implemented, tested (37 pytest cases), and run
+end-to-end against all 6 starter PDFs (511 pages): 3,198 facts, 2,510 relations, 119 logged
+issues, committed as `data/knowledge.db`. All four required cases identified from real
+results (see README.md). Remaining: record the demo video, create the GitHub repo and push.
 Last updated: 2026-09-08
 
 ---
@@ -168,8 +171,8 @@ lost later.
 
 | # | Decision | Choice | Why |
 |---|---|---|---|
-| D1 | Primary LLM | **Google Gemini `gemini-flash-latest`** (free tier) | Free quota covers all ~511 pages, strong structured-JSON output, large context so a table can be sent with its caption intact. Keeps the project genuinely free to reproduce. |
-| D2 | LLM portability | Provider-agnostic adapter: Gemini / OpenAI / Anthropic / Ollama | Whichever key is present is used. Falls back to local Ollama if none. The grader is never blocked by a missing key. |
+| D1 | Primary LLM | **Google Gemini**, model chosen by automatic fallover (free tier) | Free quota covers all ~511 pages, strong structured-JSON output. Which model name actually serves a given call varies run to run because each model name has its own separate daily quota (see §4) — the final committed run landed on `gemini-3.1-flash-lite-preview` after `gemini-flash-lite-latest` ran dry. Keeps the project genuinely free to reproduce, at the cost of that unpredictability. |
+| D2 | LLM portability | Provider-agnostic adapter: Gemini / OpenAI / Anthropic / Ollama | Whichever key is present is used; Gemini itself falls over across models before giving up. Falls back to local Ollama (`qwen3:8b`) if no key at all — used for real to generate the four showcase explanations after every Gemini model on this key ran dry for the day. The grader is never blocked by a missing key. |
 | D3 | Interface | **FastAPI serving a plain HTML/JS single page** | One process, one command, no Node build. Full layout control for showing two facts, both quotes, the computed difference and the explanation side by side. |
 | D4 | Fact scope | **Numeric facts + entity/state facts** | Covers the brief's own director example. Both kinds share one schema, so the extra cost is small. Narrative/opinion claims are deliberately excluded as not objectively comparable. |
 | D5 | Demo coverage | **All 6 PDFs, with a cheap screening pass** | Proves generality across two unrelated domains, and unlocks the strongest genuine-contradiction case (three institutions, one economy, different numbers). |
@@ -189,6 +192,31 @@ lost later.
 
 | Item | Owner | Note |
 |---|---|---|
-| Gemini API key | **You** | Free, no card, from aistudio.google.com. Goes in `.env` as `GEMINI_API_KEY`. Blocks the real extraction run; everything else can be built without it. |
-| GitHub repository | **You** | `gh` is not installed, so create an empty repo in the browser. I will hand you the two push commands. |
-| Demo video | **You** | I cannot record. I will write a shot-by-shot script under 3 minutes with exact clicks. |
+| ~~Gemini API key~~ | done | Supplied, used, and burned through several free-tier quota buckets in one afternoon (see §4). |
+| GitHub repository | **You** | Repo is at `github.com/Tanmay268/FactMesh` (you supplied this URL). `gh` is not installed here, so pushing needs `git remote add origin <url>` + `git push -u origin main`, run once you confirm the remote. |
+| Demo video | **You** | Script is in `DEMO_SCRIPT.md`, filled in with the exact relations from the real run. I cannot record; you'll need screen-recording software. |
+
+## 7. Final run results (2026-09-08)
+
+All 6 starter PDFs, 511 pages, ~2.5 hours end to end (throttled to respect the free tier's
+per-minute limit):
+
+| Document | Pages | Claims kept | Rejected | Parse errors |
+|---|---|---|---|---|
+| Delhivery Annual Report FY24 | 100 | 871 | 25 | 0 |
+| Delhivery Q4 FY24 Earnings Deck | 27 | 226 | 4 | 0 |
+| Delhivery Prospectus 2022 | 97 | 634 | 32 | 0 |
+| Economic Survey 2024-25 | 88 | 460 | 13 | 0 |
+| RBI Annual Report 2024-25 | 99 | 657 | 16 | 0 |
+| IMF India Article IV 2025 | 75 of 90 | 350 | 14 | 15 |
+
+Totals: **3,198 claims**, **2,510 relations** (127 CORROBORATES, 629 CONTRADICTS, 1,003
+RECONCILED_BY_CONTEXT, 751 UNRESOLVED), **119 issues logged** (104 quote_not_found, 15
+parse_error). The IMF document's 15 pages of parse errors and 15 skipped pages were a
+mid-run quota/rate hiccup on the model then in use — the automatic fallover (added
+specifically because of this kind of failure, see the D-decisions and the git log) still
+carried the rest of the document through successfully.
+
+The four required cases (exact relation IDs, quotes, and LLM-polished explanations) are
+written up in full in `README.md` under "The four required cases", pulled from this run via
+`scripts/find_showcase.py`.
