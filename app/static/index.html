@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Fact Knowledge Layer</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --border: #e2e0da; --text: #232220; --muted: #6b6860;
+    --accent: #2563eb; --green: #15803d; --green-bg: #ecfdf3; --red: #b91c1c; --red-bg: #fef2f2;
+    --amber: #b45309; --amber-bg: #fffbeb; --gray-bg: #f3f2ee;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, Segoe UI, Helvetica, Arial, sans-serif; }
+  header { background: var(--panel); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 10; }
+  header h1 { font-size: 17px; margin: 0; font-weight: 650; }
+  header .sub { color: var(--muted); font-size: 12.5px; }
+  nav { display: flex; gap: 4px; margin-left: 24px; }
+  nav button { border: none; background: transparent; padding: 8px 14px; border-radius: 7px; cursor: pointer; font-size: 13.5px; color: var(--muted); }
+  nav button.active { background: var(--gray-bg); color: var(--text); font-weight: 600; }
+  main { max-width: 1080px; margin: 0 auto; padding: 24px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  input[type=text], select { border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px; font-size: 13px; background: #fff; color: var(--text); }
+  button.btn { border: 1px solid var(--border); background: var(--gray-bg); border-radius: 7px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
+  button.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .drop { border: 2px dashed var(--border); border-radius: 12px; padding: 28px; text-align: center; color: var(--muted); cursor: pointer; }
+  .drop.hover { border-color: var(--accent); background: #eff4ff; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .02em; }
+  tr:hover { background: var(--gray-bg); cursor: pointer; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 650; }
+  .badge.CORROBORATES { background: var(--green-bg); color: var(--green); }
+  .badge.CONTRADICTS { background: var(--red-bg); color: var(--red); }
+  .badge.RECONCILED_BY_CONTEXT { background: var(--amber-bg); color: var(--amber); }
+  .badge.UNRESOLVED { background: var(--gray-bg); color: var(--muted); }
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stat { text-align: center; }
+  .stat .n { font-size: 24px; font-weight: 700; }
+  .stat .l { font-size: 12px; color: var(--muted); }
+  .relation-card { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+  .fact-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 10px 0; }
+  .fact-box { background: var(--gray-bg); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+  .fact-box .quote { font-style: italic; color: #444; margin-top: 6px; border-left: 3px solid var(--border); padding-left: 8px; }
+  .fact-box .meta { color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+  .explanation { background: #f5f7ff; border-radius: 8px; padding: 10px 12px; font-size: 13.5px; margin-top: 8px; }
+  .trace { font-size: 11.5px; color: var(--muted); margin-top: 6px; white-space: pre-wrap; font-family: ui-monospace, monospace; }
+  .empty { color: var(--muted); text-align: center; padding: 30px; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: flex-start; justify-content: center; padding-top: 60px; z-index: 100; }
+  .modal { background: #fff; border-radius: 12px; max-width: 640px; width: 92%; max-height: 80vh; overflow: auto; padding: 20px 22px; }
+  .modal h3 { margin-top: 0; }
+  .kv { display: grid; grid-template-columns: 140px 1fr; gap: 4px 12px; font-size: 13px; margin: 10px 0; }
+  .kv div:nth-child(odd) { color: var(--muted); }
+  #log { font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted); white-space: pre-wrap; margin-top: 10px; max-height: 140px; overflow: auto; }
+  .pill { display:inline-block; background: var(--gray-bg); border-radius:20px; padding:2px 9px; font-size:11.5px; margin-right:4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Fact Knowledge Layer</h1>
+  <span class="sub" id="providerLabel"></span>
+  <nav>
+    <button data-tab="upload" class="active">Upload</button>
+    <button data-tab="facts">Facts</button>
+    <button data-tab="relations">Relations</button>
+    <button data-tab="schema">Schema</button>
+    <button data-tab="issues">Issues</button>
+  </nav>
+</header>
+<main>
+
+  <section id="tab-upload">
+    <div class="panel">
+      <div class="stat-grid" id="statGrid"></div>
+    </div>
+    <div class="panel">
+      <div class="drop" id="drop">Drop a PDF here, or click to choose one</div>
+      <input type="file" id="fileInput" accept="application/pdf" style="display:none" />
+      <div id="log"></div>
+    </div>
+    <div class="panel">
+      <h3 style="margin-top:0">Documents</h3>
+      <table id="docsTable"><thead><tr><th>Title</th><th>Type</th><th>Pages</th><th>Facts</th><th>Uploaded</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <section id="tab-facts" style="display:none">
+    <div class="panel row">
+      <input type="text" id="factSearch" placeholder="Search subject, metric or quote…" style="flex:1; min-width:200px" />
+      <select id="factKind"><option value="">All kinds</option><option value="numeric">Numeric</option><option value="entity_state">Entity / state</option></select>
+      <button class="btn primary" onclick="loadFacts()">Search</button>
+    </div>
+    <div class="panel">
+      <table id="factsTable">
+        <thead><tr><th>Subject</th><th>Metric</th><th>Value</th><th>Period</th><th>Page</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="factsEmpty" style="display:none">No facts yet — upload a PDF to get started.</div>
+    </div>
+  </section>
+
+  <section id="tab-relations" style="display:none">
+    <div class="panel row">
+      <select id="verdictFilter">
+        <option value="">All verdicts</option>
+        <option value="CORROBORATES">Corroborates</option>
+        <option value="CONTRADICTS">Contradicts</option>
+        <option value="RECONCILED_BY_CONTEXT">Reconciled by context</option>
+        <option value="UNRESOLVED">Unresolved</option>
+      </select>
+      <button class="btn primary" onclick="loadRelations()">Filter</button>
+    </div>
+    <div id="relationsList"></div>
+    <div class="empty" id="relationsEmpty" style="display:none">No relations yet.</div>
+  </section>
+
+  <section id="tab-schema" style="display:none">
+    <div class="panel">
+      <h3 style="margin-top:0">Metrics registry <span class="sub">(grows as new kinds of facts appear)</span></h3>
+      <table id="metricsTable"><thead><tr><th>Canonical name</th><th>Kind</th><th>Aliases seen</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="panel">
+      <h3 style="margin-top:0">Entities</h3>
+      <table id="entitiesTable"><thead><tr><th>Canonical name</th><th>Aliases seen</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <section id="tab-issues" style="display:none">
+    <div class="panel">
+      <p class="sub">Everything the system rejected or flagged, kept visible rather than silently dropped.</p>
+      <table id="issuesTable"><thead><tr><th>Type</th><th>Detail</th><th>Document</th><th>When</th></tr></thead><tbody></tbody></table>
+      <div class="empty" id="issuesEmpty" style="display:none">No issues logged.</div>
+    </div>
+  </section>
+
+</main>
+<div id="modalRoot"></div>
+
+<script>
+const API = "";
+
+document.querySelectorAll("nav button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll("main > section").forEach(s => s.style.display = "none");
+    document.getElementById("tab-" + btn.dataset.tab).style.display = "block";
+    if (btn.dataset.tab === "facts") loadFacts();
+    if (btn.dataset.tab === "relations") loadRelations();
+    if (btn.dataset.tab === "schema") loadSchema();
+    if (btn.dataset.tab === "issues") loadIssues();
+  });
+});
+
+async function fetchJSON(url, opts) {
+  const r = await fetch(API + url, opts);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+function esc(s) { return (s ?? "").toString().replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+async function loadStats() {
+  const s = await fetchJSON("/api/stats");
+  document.getElementById("providerLabel").textContent = "LLM provider: " + s.provider;
+  const g = document.getElementById("statGrid");
+  g.innerHTML = `
+    <div class="stat"><div class="n">${s.documents}</div><div class="l">documents</div></div>
+    <div class="stat"><div class="n">${s.claims}</div><div class="l">facts</div></div>
+    <div class="stat"><div class="n">${s.relations}</div><div class="l">relations</div></div>
+    <div class="stat"><div class="n">${s.issues}</div><div class="l">issues logged</div></div>`;
+  await loadDocs();
+}
+
+async function loadDocs() {
+  const docs = await fetchJSON("/api/documents");
+  const tbody = document.querySelector("#docsTable tbody");
+  tbody.innerHTML = docs.map(d => `<tr>
+    <td>${esc(d.title || d.filename)}</td><td>${esc(d.doc_type || "—")}</td>
+    <td>${d.page_count}</td><td>${d.claim_count}</td>
+    <td>${new Date(d.uploaded_at).toLocaleString()}</td></tr>`).join("") ||
+    `<tr><td colspan="5" class="empty">No documents yet.</td></tr>`;
+}
+
+const drop = document.getElementById("drop");
+const fileInput = document.getElementById("fileInput");
+drop.addEventListener("click", () => fileInput.click());
+["dragover","dragenter"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("hover"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("hover"); }));
+drop.addEventListener("drop", e => { if (e.dataTransfer.files.length) uploadFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener("change", e => { if (e.target.files.length) uploadFile(e.target.files[0]); });
+
+async function uploadFile(file) {
+  const log = document.getElementById("log");
+  log.textContent = `Uploading ${file.name}…\n`;
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch("/api/documents", { method: "POST", body: fd });
+  const { job_id } = await res.json();
+  log.textContent += `Queued as job ${job_id}. Processing…\n(this can take a few minutes for a large PDF)\n`;
+  const poll = setInterval(async () => {
+    const job = await fetchJSON(`/api/jobs/${job_id}`);
+    if (job.status === "done") {
+      clearInterval(poll);
+      log.textContent += `Done: ${JSON.stringify(job.result.extract_stats)}\n`;
+      log.textContent += `Relations found: ${JSON.stringify(job.result.relation_counts)}\n`;
+      loadStats();
+    } else if (job.status === "error") {
+      clearInterval(poll);
+      log.textContent += `Error: ${job.error}\n`;
+    } else {
+      log.textContent += `.`;
+    }
+  }, 3000);
+}
+
+async function loadFacts() {
+  const q = document.getElementById("factSearch").value;
+  const kind = document.getElementById("factKind").value;
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (kind) params.set("kind", kind);
+  const facts = await fetchJSON("/api/facts?" + params.toString());
+  const tbody = document.querySelector("#factsTable tbody");
+  document.getElementById("factsEmpty").style.display = facts.length ? "none" : "block";
+  tbody.innerHTML = facts.map(f => `<tr onclick='showFact(${JSON.stringify(f.id)})'>
+    <td>${esc(f.subject)}</td><td>${esc(f.metric)}</td>
+    <td>${esc(f.value_raw ?? f.state_value ?? "—")} ${esc(f.value_unit||"")}</td>
+    <td>${esc(f.period_label || "—")}</td><td>${f.page_num}</td></tr>`).join("");
+}
+
+async function showFact(id) {
+  const f = await fetchJSON(`/api/facts/${id}`);
+  const root = document.getElementById("modalRoot");
+  root.innerHTML = `<div class="modal-bg" onclick="if(event.target===this)this.remove()"><div class="modal">
+    <h3>${esc(f.subject)} — ${esc(f.metric)}</h3>
+    <div class="kv">
+      <div>Value</div><div>${esc(f.value_raw ?? f.state_value ?? "—")} ${esc(f.value_unit||"")} ${f.value_scale?("("+esc(f.value_scale)+")"):""}</div>
+      <div>Normalized</div><div>${f.value_normalized ?? "—"}</div>
+      <div>Period</div><div>${esc(f.period_label || "—")} (${esc(f.period_type||"—")})</div>
+      <div>Qualifiers</div><div>${esc(JSON.stringify(f.qualifiers))}</div>
+      <div>Confidence</div><div>${f.confidence ?? "—"}</div>
+      <div>Document</div><div>${esc(f.document_title || f.document_filename)}, page ${f.page_num}</div>
+      <div>Notes</div><div>${esc(f.notes || "—")}</div>
+    </div>
+    <div class="fact-box"><b>Source quote</b><div class="quote">“${esc(f.quote)}”</div></div>
+    <div class="row" style="margin-top:14px"><button class="btn" onclick="this.closest('.modal-bg').remove()">Close</button></div>
+  </div></div>`;
+}
+
+function factSummary(f) {
+  if (!f) return "(missing)";
+  const val = f.value_raw ?? f.state_value ?? "—";
+  return `${f.subject} — ${f.metric}: ${val} ${f.value_unit||""} ${f.period_label?("("+f.period_label+")"):""}`;
+}
+
+async function loadRelations() {
+  const verdict = document.getElementById("verdictFilter").value;
+  const params = new URLSearchParams();
+  if (verdict) params.set("verdict", verdict);
+  const rels = await fetchJSON("/api/relations?" + params.toString());
+  const list = document.getElementById("relationsList");
+  document.getElementById("relationsEmpty").style.display = rels.length ? "none" : "block";
+  list.innerHTML = rels.map(r => `
+    <div class="relation-card">
+      <span class="badge ${r.verdict}">${r.verdict.replace(/_/g," ")}</span>
+      ${r.axis ? `<span class="pill">axis: ${esc(r.axis)}</span>` : ""}
+      <div class="fact-pair">
+        <div class="fact-box"><b>${esc(factSummary(r.claim_a))}</b>
+          <div class="quote">“${esc(r.claim_a?.quote)}”</div>
+          <div class="meta">${esc(r.claim_a?.document_filename)}, p.${r.claim_a?.page_num}</div></div>
+        <div class="fact-box"><b>${esc(factSummary(r.claim_b))}</b>
+          <div class="quote">“${esc(r.claim_b?.quote)}”</div>
+          <div class="meta">${esc(r.claim_b?.document_filename)}, p.${r.claim_b?.page_num}</div></div>
+      </div>
+      <div class="explanation">${esc(r.explanation)}</div>
+      <details><summary style="cursor:pointer; color:var(--muted); font-size:12px; margin-top:6px">rule trace</summary>
+        <div class="trace">${esc((r.rule_trace||[]).join("\\n"))}</div></details>
+    </div>`).join("");
+}
+
+async function loadSchema() {
+  const s = await fetchJSON("/api/schema");
+  document.querySelector("#metricsTable tbody").innerHTML = s.metrics.map(m =>
+    `<tr><td>${esc(m.name)}</td><td>${esc(m.kind)}</td><td>${m.aliases.map(esc).join(", ")}</td></tr>`).join("") ||
+    `<tr><td colspan="3" class="empty">No metrics yet.</td></tr>`;
+  document.querySelector("#entitiesTable tbody").innerHTML = s.entities.map(e =>
+    `<tr><td>${esc(e.name)}</td><td>${e.aliases.map(esc).join(", ")}</td></tr>`).join("") ||
+    `<tr><td colspan="2" class="empty">No entities yet.</td></tr>`;
+}
+
+async function loadIssues() {
+  const issues = await fetchJSON("/api/issues");
+  document.getElementById("issuesEmpty").style.display = issues.length ? "none" : "block";
+  document.querySelector("#issuesTable tbody").innerHTML = issues.map(i =>
+    `<tr><td>${esc(i.issue_type)}</td><td>${esc(i.detail)}</td><td>${esc(i.document_filename||"—")}</td>
+     <td>${new Date(i.created_at).toLocaleString()}</td></tr>`).join("");
+}
+
+loadStats();
+</script>
+</body>
+</html>
