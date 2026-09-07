@@ -127,13 +127,37 @@ Other real failure modes seen in the data:
 |---|---|
 | Python | 3.13.7 |
 | Node | v22.16.0 |
-| Git | 2.55.0 — **the folder is not a git repo yet** |
-| `gh` CLI | **Not installed** — GitHub repo has to be created in the browser |
-| Docker | 28.3.2 |
-| Already installed | fastapi, uvicorn, pdfplumber, pypdf, pypdfium2, streamlit, numpy, pandas, torch, openai, anthropic |
-| Ollama | Installed, with `llama3`, `qwen3`, `llava`, `nomic-embed-text` pulled locally |
-| API keys in env | **None found.** No OpenAI / Anthropic / Gemini key is set. |
+| Git | 2.55.0 — repo initialised here, meaningful staged commits per module |
+| `gh` CLI | **Not installed** — GitHub repo created in the browser, pushed manually |
+| Docker | 28.3.2 (unused — not needed for this project) |
+| Installed for this project | fastapi, uvicorn, python-multipart, pymupdf, pdfplumber, requests, python-dotenv, pydantic, pytest |
+| Ollama | Installed, with `llama3`, `qwen3`, `llava`, `nomic-embed-text` pulled locally — used as the embedding source and as the no-key fallback |
+| API keys in env | Gemini key supplied by the user, in `.env` (gitignored) |
 | Internet | Working |
+
+### A real constraint discovered mid-build: Gemini's free tier
+
+Google's free tier gives **each model name its own separate daily request quota**,
+and some of them are surprisingly small:
+
+| Model name tried | Underlying model | Free daily quota |
+|---|---|---|
+| `gemini-2.5-flash`, `gemini-2.5-flash-lite` | — | **0** — retired for new API keys (404) |
+| `gemini-flash-lite-latest` | gemini-3.5-flash-lite | 500/day |
+| `gemini-flash-latest` | gemini-3.8-flash | **20/day** |
+| `gemini-3-flash-preview` | gemini-3-flash-preview | worked when tried; exact limit not surfaced |
+| `gemini-pro-latest` | — | effectively 0 (quota already exhausted on this key) |
+
+This was found the hard way: iterating on the pipeline burned through the 500/day
+budget on `gemini-flash-lite-latest`, then the 20/day budget on `gemini-flash-latest`,
+then the 20/day budget on `gemini-3-flash-preview`, within a single afternoon of
+development. Manually hunting for a model with quota left every time was clearly not
+sustainable for a run covering 511 pages, so `app/llm/gemini.py` now falls over
+automatically: it tries the configured `GEMINI_MODEL` first, and on a daily-quota 429
+specifically (detected from the error body, not just any 429) it moves to the next
+model in a fixed fallback list and keeps going, sticky for the rest of the process. A
+transient 429/503 still retries the *same* model first, as before — fallover only
+triggers on the quota signal, not on ordinary rate limiting.
 
 ---
 

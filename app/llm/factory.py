@@ -24,7 +24,7 @@ def get_adapter() -> LLMAdapter:
 
     provider = settings.active_provider
     if provider == "gemini":
-        _adapter = GeminiAdapter(settings.gemini_api_key)  # type: ignore[arg-type]
+        _adapter = GeminiAdapter(settings.gemini_api_key, settings.gemini_model)  # type: ignore[arg-type]
     elif provider == "openai":
         _adapter = OpenAIAdapter(settings.openai_api_key)  # type: ignore[arg-type]
     elif provider == "anthropic":

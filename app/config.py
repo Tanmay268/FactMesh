@@ -20,6 +20,7 @@ load_dotenv(ROOT_DIR / ".env")
 @dataclass(frozen=True)
 class Settings:
     gemini_api_key: str | None
+    gemini_model: str
     openai_api_key: str | None
     anthropic_api_key: str | None
     ollama_host: str
@@ -55,6 +56,7 @@ def load_settings() -> Settings:
 
     return Settings(
         gemini_api_key=_get("GEMINI_API_KEY") or None,
+        gemini_model=_get("GEMINI_MODEL", "gemini-flash-lite-latest"),
         openai_api_key=_get("OPENAI_API_KEY") or None,
         anthropic_api_key=_get("ANTHROPIC_API_KEY") or None,
         ollama_host=_get("OLLAMA_HOST", "http://localhost:11434"),

@@ -16,15 +16,37 @@ API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
 MIN_INTERVAL_SECONDS = 4.5
 MAX_ATTEMPTS = 4
 
+# Discovered the hard way while building this: Google's free tier gives each
+# MODEL NAME its own separate daily request quota, and they vary wildly --
+# from 20/day to 500/day -- with no way to know which in advance. A model
+# picked at the start of a long ingest run can run out of quota partway
+# through. Rather than let that abort the run, the adapter falls back
+# through this list (after the configured model, tried first) and keeps
+# going on the next one -- sticky for the rest of the process, so it
+# doesn't thrash back and forth once a working model is found.
+FALLBACK_MODELS = [
+    "gemini-flash-lite-latest",
+    "gemini-3.1-flash-lite-preview",
+    "gemini-3-flash-preview",
+    "gemini-flash-latest",
+    "gemini-pro-latest",
+]
+
 
 class GeminiAdapter(LLMAdapter):
     name = "gemini"
     _lock = threading.Lock()
     _last_call_ts = 0.0
 
-    def __init__(self, api_key: str, model: str = "gemini-flash-latest"):
+    def __init__(self, api_key: str, model: str = "gemini-flash-lite-latest"):
         self.api_key = api_key
-        self.model = model
+        # The configured model is tried first; fallbacks follow, de-duplicated.
+        self._models = [model] + [m for m in FALLBACK_MODELS if m != model]
+        self._model_index = 0
+
+    @property
+    def model(self) -> str:
+        return self._models[self._model_index]
 
     def _wait_for_turn(self):
         with GeminiAdapter._lock:
@@ -34,8 +56,35 @@ class GeminiAdapter(LLMAdapter):
                 time.sleep(wait)
             GeminiAdapter._last_call_ts = time.monotonic()
 
+    def _call_once(self, model: str, body: dict) -> tuple[str | None, str | None, bool]:
+        """Returns (text, error, is_daily_quota_exhausted)."""
+        url = f"{API_ROOT}/{model}:generateContent?key={self.api_key}"
+        try:
+            resp = requests.post(url, json=body, timeout=90)
+        except requests.RequestException as e:
+            return None, str(e), False
+
+        if resp.status_code == 429:
+            exhausted = "PerDay" in resp.text or "RESOURCE_EXHAUSTED" in resp.text
+            return None, "429 rate limited", exhausted
+        if resp.status_code in (500, 502, 503, 504):
+            return None, f"{resp.status_code} server error", False
+        try:
+            resp.raise_for_status()
+            data = resp.json()
+        except (requests.RequestException, ValueError) as e:
+            return None, str(e), False
+
+        candidates = data.get("candidates") or []
+        if not candidates:
+            return None, f"no candidates returned: {data.get('promptFeedback', {})}", False
+        parts = candidates[0].get("content", {}).get("parts", [])
+        text = "".join(p.get("text", "") for p in parts if "text" in p)
+        if not text:
+            return None, "empty response text", False
+        return text, None, False
+
     def generate(self, system: str, prompt: str, json_mode: bool = False) -> str:
-        url = f"{API_ROOT}/{self.model}:generateContent?key={self.api_key}"
         body: dict = {
             "system_instruction": {"parts": [{"text": system}]},
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
@@ -45,34 +94,27 @@ class GeminiAdapter(LLMAdapter):
             body["generationConfig"]["response_mime_type"] = "application/json"
 
         last_err: str | None = None
-        for attempt in range(MAX_ATTEMPTS):
-            self._wait_for_turn()
-            try:
-                resp = requests.post(url, json=body, timeout=90)
-                if resp.status_code == 429:
-                    last_err = "429 rate limited"
-                    time.sleep(min(8 * (attempt + 1), 20))
-                    continue
-                if resp.status_code in (500, 502, 503, 504):
-                    last_err = f"{resp.status_code} server error"
-                    time.sleep(min(4 * (attempt + 1), 12))
-                    continue
-                resp.raise_for_status()
-                data = resp.json()
-                candidates = data.get("candidates") or []
-                if not candidates:
-                    feedback = data.get("promptFeedback", {})
-                    last_err = f"no candidates returned: {feedback}"
-                    time.sleep(min(2 * (attempt + 1), 8))
-                    continue
-                parts = candidates[0].get("content", {}).get("parts", [])
-                text = "".join(p.get("text", "") for p in parts if "text" in p)
-                if not text:
-                    last_err = "empty response text"
-                    time.sleep(min(2 * (attempt + 1), 8))
-                    continue
-                return text
-            except requests.RequestException as e:
-                last_err = str(e)
-                time.sleep(min(3 * (attempt + 1), 10))
-        raise LLMError(f"Gemini call failed after {MAX_ATTEMPTS} attempts: {last_err}")
+        while True:
+            for attempt in range(MAX_ATTEMPTS):
+                self._wait_for_turn()
+                text, err, daily_exhausted = self._call_once(self.model, body)
+                if text is not None:
+                    return text
+                last_err = err
+                if daily_exhausted:
+                    break  # no point retrying this model -- fall over instead
+                sleep_s = min(4 * (attempt + 1), 15)
+                time.sleep(sleep_s)
+            else:
+                # Exhausted all attempts on this model without a daily-quota
+                # signal (transient errors) -- give up rather than fall over,
+                # since the problem likely isn't this model specifically.
+                raise LLMError(f"Gemini call failed after {MAX_ATTEMPTS} attempts on {self.model}: {last_err}")
+
+            if self._model_index + 1 < len(self._models):
+                self._model_index += 1
+                continue  # retry the same request on the next model
+            raise LLMError(
+                f"Gemini call failed: every model tried is quota-exhausted "
+                f"(tried {self._models}); last error: {last_err}"
+            )
