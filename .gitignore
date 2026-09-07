@@ -1,0 +1,16 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+*.db-journal
+*.db-wal
+*.db-shm
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+*.log
+/tmp/
+uploads/
+.DS_Store
+Thumbs.db
