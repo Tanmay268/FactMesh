@@ -14,7 +14,7 @@ API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
 # simple shared cooldown -- this keeps a several-hundred-page ingest run
 # from burning most of its retries on rate limiting it could have avoided.
 MIN_INTERVAL_SECONDS = 4.5
-MAX_ATTEMPTS = 6
+MAX_ATTEMPTS = 4
 
 
 class GeminiAdapter(LLMAdapter):
@@ -22,7 +22,7 @@ class GeminiAdapter(LLMAdapter):
     _lock = threading.Lock()
     _last_call_ts = 0.0
 
-    def __init__(self, api_key: str, model: str = "gemini-flash-lite-latest"):
+    def __init__(self, api_key: str, model: str = "gemini-flash-latest"):
         self.api_key = api_key
         self.model = model
 
@@ -51,11 +51,11 @@ class GeminiAdapter(LLMAdapter):
                 resp = requests.post(url, json=body, timeout=90)
                 if resp.status_code == 429:
                     last_err = "429 rate limited"
-                    time.sleep(8 * (attempt + 1))
+                    time.sleep(min(8 * (attempt + 1), 20))
                     continue
                 if resp.status_code in (500, 502, 503, 504):
                     last_err = f"{resp.status_code} server error"
-                    time.sleep(4 * (attempt + 1))
+                    time.sleep(min(4 * (attempt + 1), 12))
                     continue
                 resp.raise_for_status()
                 data = resp.json()
@@ -63,16 +63,16 @@ class GeminiAdapter(LLMAdapter):
                 if not candidates:
                     feedback = data.get("promptFeedback", {})
                     last_err = f"no candidates returned: {feedback}"
-                    time.sleep(2 * (attempt + 1))
+                    time.sleep(min(2 * (attempt + 1), 8))
                     continue
                 parts = candidates[0].get("content", {}).get("parts", [])
                 text = "".join(p.get("text", "") for p in parts if "text" in p)
                 if not text:
                     last_err = "empty response text"
-                    time.sleep(2 * (attempt + 1))
+                    time.sleep(min(2 * (attempt + 1), 8))
                     continue
                 return text
             except requests.RequestException as e:
                 last_err = str(e)
-                time.sleep(3 * (attempt + 1))
+                time.sleep(min(3 * (attempt + 1), 10))
         raise LLMError(f"Gemini call failed after {MAX_ATTEMPTS} attempts: {last_err}")

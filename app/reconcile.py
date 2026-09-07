@@ -204,7 +204,21 @@ def _explain_with_llm(adapter, a: dict, b: dict, verdict: str, axis: str | None,
         return _fallback_explanation(verdict, axis, trace), "rule"
 
 
-def reconcile_pair(conn, adapter, claim_id_a: str, claim_id_b: str) -> str:
+def reconcile_pair(conn, adapter, claim_id_a: str, claim_id_b: str, use_llm: bool = False) -> str:
+    """
+    `use_llm=False` (the default, and what bulk ingestion uses) skips the
+    network entirely: the verdict always comes from the rule engine above,
+    and the explanation is a fast, deterministic template built from the
+    same rule_trace. This is deliberate, not a fallback -- testing a full
+    ingest run against the free Gemini tier found relation counts in the
+    hundreds even for one document, and per-relation explanation calls at
+    that volume were the dominant cost and the dominant source of stalls
+    when the free tier throttled hard. Reconciliation itself (the verdict
+    and its trace) never needed the network to begin with; only the prose
+    did. Pass `use_llm=True` (or call regenerate_explanation afterwards) to
+    get an LLM-polished explanation for a specific relation -- used to
+    polish the handful of relations picked out as the four showcase cases.
+    """
     a = conn.execute("SELECT * FROM claims WHERE id = ?", (claim_id_a,)).fetchone()
     b = conn.execute("SELECT * FROM claims WHERE id = ?", (claim_id_b,)).fetchone()
 
@@ -215,14 +229,6 @@ def reconcile_pair(conn, adapter, claim_id_a: str, claim_id_b: str) -> str:
     else:
         verdict, axis, dimension_diff, trace = "UNRESOLVED", None, {}, ["mismatched claim kinds; cannot compare"]
 
-    # An LLM call is reserved for the verdicts where plain-English nuance
-    # actually earns its cost -- a contradiction or a reconciled-by-context
-    # case benefits from being phrased well. Bulk CORROBORATES/UNRESOLVED
-    # pairs (the majority once a metric recurs across many periods) get a
-    # fast, deterministic template instead; app/reconcile.py's
-    # regenerate_explanation() can upgrade any specific relation afterwards
-    # -- used to polish the handful of cases picked for the demo.
-    use_llm = verdict in ("CONTRADICTS", "RECONCILED_BY_CONTEXT")
     explanation, explained_by = _explain_with_llm(adapter if use_llm else None, a, b, verdict, axis, trace)
 
     relation_id = new_id()
