@@ -60,7 +60,7 @@ def load_settings() -> Settings:
         openai_api_key=_get("OPENAI_API_KEY") or None,
         anthropic_api_key=_get("ANTHROPIC_API_KEY") or None,
         ollama_host=_get("OLLAMA_HOST", "http://localhost:11434"),
-        ollama_model=_get("OLLAMA_MODEL", "qwen3"),
+        ollama_model=_get("OLLAMA_MODEL", "qwen3:8b"),
         ollama_embed_model=_get("OLLAMA_EMBED_MODEL", "nomic-embed-text"),
         database_path=db_path,
         upload_dir=upload_dir,
