@@ -31,6 +31,16 @@ def _parse_date(s: str | None) -> date | None:
         return None
 
 
+_PERCENT_UNITS = {"percent", "%", "percentage", "pct"}
+
+
+def _incompatible_units(unit_a: str | None, unit_b: str | None) -> bool:
+    ua, ub = (unit_a or "").strip().lower(), (unit_b or "").strip().lower()
+    if not ua or not ub:
+        return False  # an unstated unit isn't evidence of a conflict
+    return (ua in _PERCENT_UNITS) != (ub in _PERCENT_UNITS)
+
+
 def _qualifier_diff(qa: dict, qb: dict) -> dict:
     diff = {}
     for key in set(qa) & set(qb):
@@ -85,6 +95,21 @@ def _decide_numeric(a: dict, b: dict) -> tuple[str, str | None, dict, list[str]]
         va, vb = a["value_number"], b["value_number"]
     if va is None or vb is None:
         trace.append("verdict: at least one side has no comparable numeric value")
+        dimension_diff["comparable"] = False
+        return "UNRESOLVED", None, dimension_diff, trace
+
+    if _incompatible_units(a["value_unit"], b["value_unit"]):
+        # A safety net for the metric registry's fuzzy matching: "Adjusted
+        # EBITDA" and "Adjusted EBITDA margin" are similar enough in wording
+        # that they can end up sharing a metric_id, but one is a currency
+        # amount and the other a percentage -- not the same kind of
+        # quantity, and a numeric gap between them proves nothing. Refuse to
+        # call this a contradiction (or a corroboration) rather than compare
+        # numbers that were never comparable in the first place.
+        trace.append(
+            f"verdict: units are not the same kind of quantity (a: {a['value_unit']!r}, "
+            f"b: {b['value_unit']!r}) -- likely two different metrics grouped together; cannot compare"
+        )
         dimension_diff["comparable"] = False
         return "UNRESOLVED", None, dimension_diff, trace
 
@@ -190,7 +215,15 @@ def reconcile_pair(conn, adapter, claim_id_a: str, claim_id_b: str) -> str:
     else:
         verdict, axis, dimension_diff, trace = "UNRESOLVED", None, {}, ["mismatched claim kinds; cannot compare"]
 
-    explanation, explained_by = _explain_with_llm(adapter, a, b, verdict, axis, trace)
+    # An LLM call is reserved for the verdicts where plain-English nuance
+    # actually earns its cost -- a contradiction or a reconciled-by-context
+    # case benefits from being phrased well. Bulk CORROBORATES/UNRESOLVED
+    # pairs (the majority once a metric recurs across many periods) get a
+    # fast, deterministic template instead; app/reconcile.py's
+    # regenerate_explanation() can upgrade any specific relation afterwards
+    # -- used to polish the handful of cases picked for the demo.
+    use_llm = verdict in ("CONTRADICTS", "RECONCILED_BY_CONTEXT")
+    explanation, explained_by = _explain_with_llm(adapter if use_llm else None, a, b, verdict, axis, trace)
 
     relation_id = new_id()
     conn.execute(
@@ -204,6 +237,22 @@ def reconcile_pair(conn, adapter, claim_id_a: str, claim_id_b: str) -> str:
         ),
     )
     return relation_id
+
+
+def regenerate_explanation(conn, adapter, relation_id: str) -> None:
+    """Force a fresh LLM-written explanation for one existing relation,
+    regardless of its verdict. Used to polish the small number of relations
+    picked out as the four showcase cases, without paying LLM cost on every
+    one of the (potentially thousands of) bulk relations in a full run."""
+    rel = conn.execute("SELECT * FROM relations WHERE id = ?", (relation_id,)).fetchone()
+    a = conn.execute("SELECT * FROM claims WHERE id = ?", (rel["claim_id_a"],)).fetchone()
+    b = conn.execute("SELECT * FROM claims WHERE id = ?", (rel["claim_id_b"],)).fetchone()
+    trace = loads(rel["rule_trace_json"])
+    explanation, explained_by = _explain_with_llm(adapter, a, b, rel["verdict"], rel["axis"], trace)
+    conn.execute(
+        "UPDATE relations SET explanation = ?, explained_by = ? WHERE id = ?",
+        (explanation, explained_by, relation_id),
+    )
 
 
 def reconcile_pairs(conn, adapter, pairs: list[tuple[str, str]], progress_cb=None) -> dict:

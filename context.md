@@ -144,7 +144,7 @@ lost later.
 
 | # | Decision | Choice | Why |
 |---|---|---|---|
-| D1 | Primary LLM | **Google Gemini `gemini-flash-latest`** (free tier) | Free quota covers all ~511 pages, strong structured-JSON output, large context so a table can be sent with its caption intact. Keeps the project genuinely free to reproduce. |
+| D1 | Primary LLM | **Google Gemini `gemini-flash-lite-latest`** (free tier) | Free quota covers all ~511 pages, strong structured-JSON output, large context so a table can be sent with its caption intact. Keeps the project genuinely free to reproduce. |
 | D2 | LLM portability | Provider-agnostic adapter: Gemini / OpenAI / Anthropic / Ollama | Whichever key is present is used. Falls back to local Ollama if none. The grader is never blocked by a missing key. |
 | D3 | Interface | **FastAPI serving a plain HTML/JS single page** | One process, one command, no Node build. Full layout control for showing two facts, both quotes, the computed difference and the explanation side by side. |
 | D4 | Fact scope | **Numeric facts + entity/state facts** | Covers the brief's own director example. Both kinds share one schema, so the extra cost is small. Narrative/opinion claims are deliberately excluded as not objectively comparable. |

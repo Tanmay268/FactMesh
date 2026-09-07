@@ -22,7 +22,7 @@ class GeminiAdapter(LLMAdapter):
     _lock = threading.Lock()
     _last_call_ts = 0.0
 
-    def __init__(self, api_key: str, model: str = "gemini-flash-latest"):
+    def __init__(self, api_key: str, model: str = "gemini-flash-lite-latest"):
         self.api_key = api_key
         self.model = model
 

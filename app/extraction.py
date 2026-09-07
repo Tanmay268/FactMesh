@@ -42,6 +42,16 @@ verbatim, do not report it.
 2. Use the numbered blocks' own context (their section heading trail, any table \
 caption or declared units, and the "basis" field if a block is tagged consolidated or \
 standalone) to fill in unit, scale and qualifiers -- don't guess randomly.
+2b. "subject" is WHO or WHAT the fact is about at the top level -- the company, \
+country, institution or person this whole document is reporting on (e.g. "Delhivery \
+Limited", "India", "the Indian economy", "Reserve Bank of India"), inferred from the \
+document's own title, letterhead or disclaimer text if it is not restated on this page. \
+"subject" must NEVER be the same as, or a substring of, the "metric" field -- if you \
+find yourself about to write the line-item name (e.g. "Adjusted EBITDA", "Service \
+EBITDA", "CPI inflation") as the subject, that is wrong: put that in "metric" instead \
+and use the document's actual reporting entity as "subject". For a person-related fact \
+(e.g. a director's appointment or resignation), "subject" is that person's name and \
+"metric" is their role, e.g. "independent director".
 3. If a table's header block (e.g. "Q4 FY22 | Q4 FY23 | Q3 FY24 | Q4 FY24") appears \
 just before a data row block, use the header to say what period each number in the row \
 belongs to, and emit ONE fact per (row label, period) pair, quoting the actual number \
@@ -117,6 +127,26 @@ def _extract_json(raw: str) -> dict:
 
 def _normalize_for_match(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _normalize_loose(text: str) -> str:
+    return re.sub(r"[^\w]+", " ", (text or "").lower()).strip()
+
+
+def _subject_echoes_metric(subject: str, metric_raw: str) -> bool:
+    """
+    True when the model has put the line-item label in both "subject" and
+    "metric" (e.g. subject="Adjusted EBITDA", metric="Adjusted EBITDA") --
+    a real failure mode seen while testing this on the Delhivery earnings
+    deck, where slide tables restate a segment/line name without ever
+    repeating the company name on that slide. When this happens, `subject`
+    carries no usable entity at all and the document's own fallback subject
+    (see app/ingest.py::_guess_fallback_subject) should be used instead.
+    """
+    ns, nm = _normalize_loose(subject), _normalize_loose(metric_raw)
+    if not ns or not nm:
+        return False
+    return ns == nm or ns in nm or nm in ns
 
 
 def _quote_is_grounded(quote: str, block_text: str, page_text: str) -> tuple[bool, str]:
@@ -215,6 +245,8 @@ def _store_claim(conn, document_id: str, block: Block, block_id: str, claim: dic
     kind = claim.get("kind") or "numeric"
     subject = (claim.get("subject") or "").strip()
     metric_raw = (claim.get("metric") or "").strip()
+    if fallback_subject and _subject_echoes_metric(subject, metric_raw):
+        subject = fallback_subject
     qualifiers = claim.get("qualifiers") or {}
     if block.basis and "basis" not in qualifiers:
         qualifiers["basis"] = block.basis

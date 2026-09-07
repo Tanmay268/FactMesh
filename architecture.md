@@ -243,7 +243,7 @@ One page, served by the same server, no build step. Sections:
 | Storage | SQLite, one file |
 | PDF text and layout | PyMuPDF |
 | PDF tables | pdfplumber |
-| Language model | Gemini `gemini-flash-latest` by default, behind an adapter that also speaks OpenAI, Anthropic and Ollama |
+| Language model | Gemini `gemini-flash-lite-latest` by default, behind an adapter that also speaks OpenAI, Anthropic and Ollama |
 | Embeddings | Ollama `nomic-embed-text`, falling back to character n-gram similarity |
 | Tests | pytest, focused on the normalisers and the reconcile rules |
 
