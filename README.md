@@ -62,7 +62,7 @@ tables.
 
 ## Video Demo
 
-**[Link goes here once recorded]**
+**https://github.com/Tanmay268/FactMesh**
 
 ---
 
