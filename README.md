@@ -5,7 +5,6 @@ from, and then works out which facts **agree**, which **disagree**, and which on
 like they disagree until you notice they cover different time periods, different scopes,
 or different units.
 
-Built for the Superjoin VIT 2026 Engineering Intern assignment.
 
 ---
 
