@@ -63,8 +63,7 @@ tables.
 
 ## Video Demo
 
-**[Link goes here once recorded]** — see [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) for the
-shot-by-shot script, filled in with the exact relations from the real run below.
+**[Link goes here once recorded]**
 
 ---
 
@@ -331,4 +330,3 @@ Project documentation:
 | [`README.md`](README.md) | This file. How to run it and what it does. |
 | [`architecture.md`](architecture.md) | How the system works, and why it is shaped that way. |
 | [`context.md`](context.md) | The running record: the task, what is in the data, every decision and its reason, kept up to date as the build happened. |
-| [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) | Shot-by-shot script for the required demo video. |
