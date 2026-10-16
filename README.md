@@ -60,12 +60,6 @@ tables.
 
 ---
 
-## Video Demo
-
-**https://www.youtube.com/watch?v=yPCSo3ns2Q8**
-
----
-
 ## Approach
 
 Full detail, including every trade-off and why, is in [`architecture.md`](architecture.md)
