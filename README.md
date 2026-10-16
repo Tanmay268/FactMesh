@@ -323,3 +323,5 @@ Project documentation:
 | [`README.md`](README.md) | This file. How to run it and what it does. |
 | [`architecture.md`](architecture.md) | How the system works, and why it is shaped that way. |
 | [`context.md`](context.md) | The running record: the task, what is in the data, every decision and its reason, kept up to date as the build happened. |
+
+
